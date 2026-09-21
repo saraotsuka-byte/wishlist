@@ -10,6 +10,7 @@ import {
   deleteCategory,
   updateCategory,
 } from '../../repositories/categoryRepository'
+import { DataManagement } from './DataManagement'
 import { StoreManager } from './StoreManager'
 
 export function Settings() {
@@ -112,12 +113,7 @@ export function Settings() {
 
         <StoreManager />
 
-        <section>
-          <h2 className="mb-2 text-sm font-semibold">データ管理</h2>
-          <p className="text-sm text-gray-500">
-            バックアップ／復元、CSV出力は次のフェーズで実装予定です。
-          </p>
-        </section>
+        <DataManagement />
       </div>
 
       <ConfirmDialog

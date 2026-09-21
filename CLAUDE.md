@@ -21,7 +21,7 @@ npm run preview      # ビルド成果物をローカルで確認
 - データ永続化: Dexie.js（IndexedDBラッパー）。バックエンドなし、全データは端末内。
 - ルーティング: react-router-dom（`HashRouter`。静的ホスティングでもリロード時に404にならないよう採用）
 - テスト: Vitest + Testing Library（jsdom環境）
-- PWA: `vite-plugin-pwa`（フェーズ4で導入予定）
+- PWA: `vite-plugin-pwa`（`registerType: 'autoUpdate'`。`src/main.tsx` で `virtual:pwa-register` の `registerSW` を呼び出してService Workerを登録する）
 
 ## ディレクトリ構成と設計方針
 
@@ -52,6 +52,9 @@ src/
 - **使用ペース予測**は `domain/prediction.ts` の `computeDailyUsageRate` が直近90日以内の `use` ログのみから1日あたり消費量を計算する（`purchase`/`adjust` は集計対象外）。使用記録が2件未満、または記録期間が1日未満の場合は `undefined`（データ不足）を返す。`predictDaysUntilEmpty` が現在庫と消費ペースから残り日数を計算し、`isSoon`（既定7日以内）で「そろそろ」判定する。
 - **ダッシュボードの3区分**（`domain/dashboard.ts`）は「発注点以下 → 今すぐ買うべき」「未発注点だが7日以内に切れる予測 → そろそろ買う」「それ以外 → 十分ある」の優先順位で振り分ける。買い物リストの自動同期（`syncShoppingListEntries`）にも同じ予測情報を渡し、「そろそろ」品目を発注点到達前に提案として追加する（却下・スヌーズ機能は設けない）。
 - **月次支出グラフ**（`components/MonthlyExpenseChart.tsx`）は外部チャートライブラリを使わず自前の軽量SVGで実装。単一系列の棒グラフのため凡例は省略し、金額はバー上に直接ラベル表示、スクリーンリーダー向けに `sr-only` のデータテーブルを併設する。集計ロジックは `domain/expense.ts` の `computeMonthlyExpenses`（純粋関数）に分離してテストする。
+- **バックアップ／復元は全置き換え方式**。`domain/backup.ts` がJSONの妥当性検証（`parseBackup`）を担い、`repositories/backupRepository.ts` の `importAllData` が全テーブルをclearしてからbulkAddし直す（1トランザクション）。復元は取り消せないため、実行前に確認ダイアログを必ず挟む（`pages/Settings/DataManagement.tsx`）。
+- **CSV出力**は購入履歴のみを対象とし、`domain/csv.ts` の `purchasesToCsv`（純粋関数、カンマ/改行/ダブルクォートのエスケープを含む）で文字列化する。Excelでの文字化けを防ぐため、ダウンロード時にUTF-8 BOM（`﻿`）を先頭に付与する。
+- **PWAアイコン**は依存パッケージを増やさず、`scripts/generate-icons.mjs`（Node標準の`zlib`のみでPNGを直接エンコードする使い切りスクリプト）で `public/icons/icon-192.png` / `icon-512.png` を生成した。アイコンを変更したい場合はこのスクリプトを編集して再実行する（`node scripts/generate-icons.mjs`）。
 
 ## テスト方針
 
@@ -63,7 +66,7 @@ src/
 1. プロジェクト初期化・DB層・品目CRUD・在庫増減（完了）
 2. 買い物リストと購入完了フロー・購入履歴（完了）
 3. 使用ペース予測・ダッシュボード・支出グラフ（完了）
-4. バックアップ/復元・CSV出力・PWA対応・仕上げ
+4. バックアップ/復元・CSV出力・PWA対応・仕上げ（完了）
 
 ## スコープ外（今回やらないこと）
 

@@ -6,6 +6,7 @@ import { isBelowReorderPoint, nextStockAfterPurchase, nextStockAfterUse } from '
 import { useCategories } from '../../hooks/useCategories'
 import { useItem } from '../../hooks/useItems'
 import { useItemStorePrices } from '../../hooks/useItemStorePrices'
+import { usePurchasesByItem } from '../../hooks/usePurchases'
 import { useStockLogsByItem } from '../../hooks/useStockLogs'
 import { useStores } from '../../hooks/useStores'
 import { setItemStock } from '../../repositories/itemRepository'
@@ -29,6 +30,7 @@ export function ItemDetail() {
   const stores = useStores()
   const prices = useItemStorePrices(id)
   const logs = useStockLogsByItem(id)
+  const purchases = usePurchasesByItem(id)
 
   if (!item) {
     return (
@@ -42,6 +44,7 @@ export function ItemDetail() {
   const category = categories.find((c) => c.id === item.categoryId)
   const low = isBelowReorderPoint(item.stock, item.reorderPoint)
   const minPrice = prices.length > 0 ? Math.min(...prices.map((p) => p.lastPrice)) : undefined
+  const nonPurchaseLogs = logs.filter((log) => log.type !== 'purchase')
 
   async function handleDecrement() {
     if (!item) return
@@ -154,12 +157,36 @@ export function ItemDetail() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-semibold">履歴</h2>
-          {logs.length === 0 ? (
+          <h2 className="mb-2 text-sm font-semibold">購入履歴</h2>
+          {purchases.length === 0 ? (
+            <p className="text-sm text-gray-500">まだ購入履歴がありません。</p>
+          ) : (
+            <ul className="divide-y divide-gray-200 dark:divide-gray-800">
+              {purchases.map((purchase) => {
+                const store = stores.find((s) => s.id === purchase.storeId)
+                return (
+                  <li key={purchase.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                    <span>{formatDate(purchase.date)}</span>
+                    <span className="text-gray-500">{store?.name ?? '店舗未指定'}</span>
+                    <span className="tabular-nums">
+                      {purchase.quantity}
+                      {item.unit}
+                      {purchase.unitPrice != null && ` / ¥${purchase.unitPrice.toLocaleString()}`}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-2 text-sm font-semibold">使用・調整履歴</h2>
+          {nonPurchaseLogs.length === 0 ? (
             <p className="text-sm text-gray-500">まだ履歴がありません。</p>
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-              {logs.map((log) => (
+              {nonPurchaseLogs.map((log) => (
                 <li key={log.id} className="flex items-center justify-between py-2 text-sm">
                   <span>{formatDate(log.date)}</span>
                   <span className="text-gray-500">{LOG_TYPE_LABEL[log.type] ?? log.type}</span>

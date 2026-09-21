@@ -10,6 +10,7 @@ import {
   deleteCategory,
   updateCategory,
 } from '../../repositories/categoryRepository'
+import { StoreManager } from './StoreManager'
 
 export function Settings() {
   const categories = useCategories()
@@ -109,10 +110,12 @@ export function Settings() {
           </div>
         </section>
 
+        <StoreManager />
+
         <section>
-          <h2 className="mb-2 text-sm font-semibold">店舗管理・データ管理</h2>
+          <h2 className="mb-2 text-sm font-semibold">データ管理</h2>
           <p className="text-sm text-gray-500">
-            店舗管理、バックアップ／復元、CSV出力は次のフェーズで実装予定です。
+            バックアップ／復元、CSV出力は次のフェーズで実装予定です。
           </p>
         </section>
       </div>

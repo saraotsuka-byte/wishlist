@@ -82,36 +82,32 @@ function makeIcon(size) {
     }
   }
 
-  // シンプルな買い物かごのシルエット（台形 + 取っ手の弧）
-  const top = size * 0.34
-  const bottom = size * 0.72
-  const topHalfWidth = size * 0.14
-  const bottomHalfWidth = size * 0.26
-  const centerX = size / 2
-  const stroke = Math.max(2, size * 0.035)
+  // シンプルなチェックマーク（2本の太い線分）
+  const stroke = size * 0.09
+  const points = [
+    [size * 0.28, size * 0.54],
+    [size * 0.44, size * 0.7],
+    [size * 0.74, size * 0.32],
+  ]
 
-  for (let y = Math.round(top); y <= Math.round(bottom); y++) {
-    const t = (y - top) / (bottom - top)
-    const halfWidth = topHalfWidth + (bottomHalfWidth - topHalfWidth) * t
-    const left = Math.round(centerX - halfWidth)
-    const right = Math.round(centerX + halfWidth)
-    for (let x = left; x <= right; x++) {
-      const nearEdge = x - left < stroke || right - x < stroke
-      const nearBottom = bottom - y < stroke
-      if (nearEdge || nearBottom) set(x, y, WHITE)
-    }
+  function distToSegment(px, py, [ax, ay], [bx, by]) {
+    const abx = bx - ax
+    const aby = by - ay
+    const lenSq = abx * abx + aby * aby
+    let t = lenSq === 0 ? 0 : ((px - ax) * abx + (py - ay) * aby) / lenSq
+    t = Math.max(0, Math.min(1, t))
+    const cx = ax + t * abx
+    const cy = ay + t * aby
+    return Math.hypot(px - cx, py - cy)
   }
 
-  // 取っ手（半円弧）
-  const handleRadius = size * 0.15
-  const handleCenterY = top - handleRadius * 0.35
-  for (let angle = 180; angle <= 360; angle += 1) {
-    const rad = (angle * Math.PI) / 180
-    for (let w = 0; w < stroke; w++) {
-      const r = handleRadius - w
-      const x = Math.round(centerX + r * Math.cos(rad))
-      const y = Math.round(handleCenterY + r * Math.sin(rad))
-      set(x, y, WHITE)
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const d = Math.min(
+        distToSegment(x, y, points[0], points[1]),
+        distToSegment(x, y, points[1], points[2]),
+      )
+      if (d <= stroke / 2) set(x, y, WHITE)
     }
   }
 

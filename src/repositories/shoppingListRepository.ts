@@ -46,6 +46,13 @@ export async function removeEntry(id: string): Promise<void> {
   await db.shoppingListEntries.delete(id)
 }
 
+export async function bulkUpdateReason(
+  updates: { id: string; reason: 'reorder' | 'soon' }[],
+): Promise<void> {
+  if (updates.length === 0) return
+  await Promise.all(updates.map((u) => db.shoppingListEntries.update(u.id, { reason: u.reason })))
+}
+
 /**
  * チェック済みの買い物リストエントリを一括で「購入完了」にする。
  * 在庫加算・使用/購入ログ保存・購入履歴保存・リストからの除外を1トランザクションで行う。

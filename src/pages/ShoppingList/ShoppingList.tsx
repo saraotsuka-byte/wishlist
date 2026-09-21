@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { PageHeader } from '../../components/PageHeader'
 import { useAllItemStorePrices } from '../../hooks/useAllItemStorePrices'
 import { useItems } from '../../hooks/useItems'
+import { usePredictions } from '../../hooks/usePredictions'
 import { useShoppingListEntries } from '../../hooks/useShoppingList'
 import { useStores } from '../../hooks/useStores'
 import { syncShoppingListEntries, type CheckedEntryInput } from '../../domain/shoppingList'
@@ -12,6 +13,7 @@ import {
   addManualEntry,
   bulkAddEntries,
   bulkRemoveEntries,
+  bulkUpdateReason,
   completePurchase,
   removeEntry,
   setEntryChecked,
@@ -31,6 +33,7 @@ export function ShoppingList() {
   const entries = useShoppingListEntries()
   const stores = useStores()
   const prices = useAllItemStorePrices()
+  const daysUntilEmptyByItemId = usePredictions(items)
 
   const [addingItemId, setAddingItemId] = useState('')
   const [addingQty, setAddingQty] = useState(1)
@@ -38,11 +41,17 @@ export function ShoppingList() {
 
   useEffect(() => {
     if (items.length === 0) return
-    const { toAdd, toRemoveIds } = syncShoppingListEntries(items, entries, Date.now())
+    const { toAdd, toRemoveIds, toUpdateReason } = syncShoppingListEntries(
+      items,
+      entries,
+      Date.now(),
+      daysUntilEmptyByItemId,
+    )
     if (toAdd.length > 0) void bulkAddEntries(toAdd)
     if (toRemoveIds.length > 0) void bulkRemoveEntries(toRemoveIds)
+    if (toUpdateReason.length > 0) void bulkUpdateReason(toUpdateReason)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, entries])
+  }, [items, entries, daysUntilEmptyByItemId])
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
 
@@ -139,7 +148,15 @@ export function ShoppingList() {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">{item.name}</p>
-                        <Badge tone={entry.reason === 'manual' ? 'neutral' : 'danger'}>
+                        <Badge
+                          tone={
+                            entry.reason === 'manual'
+                              ? 'neutral'
+                              : entry.reason === 'soon'
+                                ? 'warning'
+                                : 'danger'
+                          }
+                        >
                           {REASON_LABEL[entry.reason]}
                         </Badge>
                       </div>

@@ -4,15 +4,18 @@ import { Badge } from '../../components/Badge'
 import { Button } from '../../components/Button'
 import { MinusIcon, PlusIcon, SearchIcon } from '../../components/icons'
 import { PageHeader } from '../../components/PageHeader'
+import { isSoon } from '../../domain/prediction'
 import { isBelowReorderPoint, nextStockAfterPurchase, nextStockAfterUse } from '../../domain/stock'
 import { useCategories } from '../../hooks/useCategories'
 import { useItems } from '../../hooks/useItems'
+import { usePredictions } from '../../hooks/usePredictions'
 import { setItemStock } from '../../repositories/itemRepository'
 import { addStockLog } from '../../repositories/stockLogRepository'
 
 export function ItemList() {
   const items = useItems()
   const categories = useCategories()
+  const daysUntilEmptyByItemId = usePredictions(items)
   const [query, setQuery] = useState('')
   const [categoryId, setCategoryId] = useState<string>('all')
 
@@ -95,6 +98,7 @@ export function ItemList() {
         {filtered.map((item) => {
           const category = categories.find((c) => c.id === item.categoryId)
           const low = isBelowReorderPoint(item.stock, item.reorderPoint)
+          const soon = !low && isSoon(daysUntilEmptyByItemId.get(item.id))
           return (
             <li key={item.id} className="flex items-center gap-3 py-3">
               <Link to={`/items/${item.id}`} className="min-w-0 flex-1">
@@ -102,6 +106,7 @@ export function ItemList() {
                 <p className="mt-0.5 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                   {category && <span>{category.name}</span>}
                   {low && <Badge tone="danger">要補充</Badge>}
+                  {soon && <Badge tone="warning">そろそろ</Badge>}
                 </p>
               </Link>
               <div className="flex items-center gap-2">

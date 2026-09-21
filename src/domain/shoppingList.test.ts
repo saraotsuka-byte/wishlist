@@ -77,6 +77,45 @@ describe('syncShoppingListEntries', () => {
     const result = syncShoppingListEntries([item], [entry], 1000)
     expect(result.toRemoveIds).toHaveLength(0)
   })
+
+  it('発注点は上回るが予測日が近い品目は reason: soon で追加する', () => {
+    const item = makeItem({ id: 'a', stock: 5, reorderPoint: 2 })
+    const daysUntilEmptyByItemId = new Map([['a', 5]])
+    const result = syncShoppingListEntries([item], [], 1000, daysUntilEmptyByItemId)
+    expect(result.toAdd).toHaveLength(1)
+    expect(result.toAdd[0].reason).toBe('soon')
+  })
+
+  it('発注点を下回ると reason が soon から reorder に更新される', () => {
+    const item = makeItem({ id: 'a', stock: 1, reorderPoint: 2 })
+    const entry: ShoppingListEntry = {
+      id: 'e1',
+      itemId: 'a',
+      quantity: 1,
+      isManual: false,
+      checked: false,
+      reason: 'soon',
+      addedAt: 0,
+    }
+    const result = syncShoppingListEntries([item], [entry], 1000)
+    expect(result.toUpdateReason).toEqual([{ id: 'e1', reason: 'reorder' }])
+    expect(result.toRemoveIds).toHaveLength(0)
+  })
+
+  it('そろそろの予測が外れたら自動追加エントリを削除する', () => {
+    const item = makeItem({ id: 'a', stock: 5, reorderPoint: 2 })
+    const entry: ShoppingListEntry = {
+      id: 'e1',
+      itemId: 'a',
+      quantity: 1,
+      isManual: false,
+      checked: false,
+      reason: 'soon',
+      addedAt: 0,
+    }
+    const result = syncShoppingListEntries([item], [entry], 1000, new Map([['a', 30]]))
+    expect(result.toRemoveIds).toEqual(['e1'])
+  })
 })
 
 describe('planPurchaseCompletion', () => {

@@ -1,48 +1,70 @@
 import type { Item, ShoppingListEntry } from '../types'
+import { isSoon } from './prediction'
 import { isBelowReorderPoint, nextStockAfterPurchase } from './stock'
 
 export interface ShoppingListSyncResult {
   toAdd: Omit<ShoppingListEntry, 'id'>[]
   toRemoveIds: string[]
+  toUpdateReason: { id: string; reason: 'reorder' | 'soon' }[]
+}
+
+function requiredReason(
+  item: Item,
+  daysUntilEmpty: number | undefined,
+): 'reorder' | 'soon' | null {
+  if (isBelowReorderPoint(item.stock, item.reorderPoint)) return 'reorder'
+  if (isSoon(daysUntilEmpty)) return 'soon'
+  return null
 }
 
 /**
- * 発注点以下の品目を自動で買い物リストに載せ、発注点を上回った品目の
- * 自動追加エントリ（手動追加以外）をリストから外すための差分を計算する。
+ * 発注点以下、または「そろそろ」（予測日が近い）品目を自動で買い物リストに載せ、
+ * 条件を満たさなくなった自動追加エントリ（手動追加以外）をリストから外すための
+ * 差分を計算する。既にリストにある自動追加エントリの理由（発注点以下⇔そろそろ）
+ * が変わった場合は更新対象として返す。
  */
 export function syncShoppingListEntries(
   items: Item[],
   entries: ShoppingListEntry[],
   now: number,
+  daysUntilEmptyByItemId: Map<string, number | undefined> = new Map(),
 ): ShoppingListSyncResult {
   const entryByItemId = new Map(entries.map((entry) => [entry.itemId, entry]))
 
   const toAdd: Omit<ShoppingListEntry, 'id'>[] = []
+  const toUpdateReason: ShoppingListSyncResult['toUpdateReason'] = []
   for (const item of items) {
-    if (!isBelowReorderPoint(item.stock, item.reorderPoint)) continue
-    if (entryByItemId.has(item.id)) continue
-    toAdd.push({
-      itemId: item.id,
-      quantity: item.defaultPurchaseQty,
-      isManual: false,
-      checked: false,
-      reason: 'reorder',
-      addedAt: now,
-    })
+    const reason = requiredReason(item, daysUntilEmptyByItemId.get(item.id))
+    if (reason === null) continue
+
+    const existing = entryByItemId.get(item.id)
+    if (!existing) {
+      toAdd.push({
+        itemId: item.id,
+        quantity: item.defaultPurchaseQty,
+        isManual: false,
+        checked: false,
+        reason,
+        addedAt: now,
+      })
+    } else if (!existing.isManual && existing.reason !== reason) {
+      toUpdateReason.push({ id: existing.id, reason })
+    }
   }
 
   const itemById = new Map(items.map((item) => [item.id, item]))
   const toRemoveIds: string[] = []
   for (const entry of entries) {
     if (entry.isManual) continue
-    if (entry.reason !== 'reorder') continue
+    if (entry.reason !== 'reorder' && entry.reason !== 'soon') continue
     const item = itemById.get(entry.itemId)
-    if (!item || !isBelowReorderPoint(item.stock, item.reorderPoint)) {
+    const reason = item ? requiredReason(item, daysUntilEmptyByItemId.get(entry.itemId)) : null
+    if (!item || reason === null) {
       toRemoveIds.push(entry.id)
     }
   }
 
-  return { toAdd, toRemoveIds }
+  return { toAdd, toRemoveIds, toUpdateReason }
 }
 
 export interface CheckedEntryInput {

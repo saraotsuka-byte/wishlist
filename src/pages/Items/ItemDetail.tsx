@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '../../components/Badge'
 import { MinusIcon, PlusIcon } from '../../components/icons'
 import { PageHeader } from '../../components/PageHeader'
+import { computeDailyUsageRate, isSoon, predictDaysUntilEmpty } from '../../domain/prediction'
 import { isBelowReorderPoint, nextStockAfterPurchase, nextStockAfterUse } from '../../domain/stock'
 import { useCategories } from '../../hooks/useCategories'
 import { useItem } from '../../hooks/useItems'
@@ -45,6 +46,9 @@ export function ItemDetail() {
   const low = isBelowReorderPoint(item.stock, item.reorderPoint)
   const minPrice = prices.length > 0 ? Math.min(...prices.map((p) => p.lastPrice)) : undefined
   const nonPurchaseLogs = logs.filter((log) => log.type !== 'purchase')
+  const dailyRate = computeDailyUsageRate(logs, Date.now())
+  const daysUntilEmpty = predictDaysUntilEmpty(item.stock, dailyRate)
+  const soon = !low && isSoon(daysUntilEmpty)
 
   async function handleDecrement() {
     if (!item) return
@@ -81,9 +85,10 @@ export function ItemDetail() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">{category?.name ?? '未分類'}</p>
-              {low && (
-                <div className="mt-1">
-                  <Badge tone="danger">要補充</Badge>
+              {(low || soon) && (
+                <div className="mt-1 flex gap-1.5">
+                  {low && <Badge tone="danger">要補充</Badge>}
+                  {soon && <Badge tone="warning">そろそろ</Badge>}
                 </div>
               )}
             </div>
@@ -128,6 +133,11 @@ export function ItemDetail() {
             </div>
           </dl>
           {item.note && <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">{item.note}</p>}
+          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+            {daysUntilEmpty === undefined
+              ? '使用ペースの予測: データ不足'
+              : `あと約${Math.max(0, Math.round(daysUntilEmpty))}日で切れそうです`}
+          </p>
         </section>
 
         <section>

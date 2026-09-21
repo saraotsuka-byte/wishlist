@@ -3,7 +3,7 @@
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 
-const BRAND = [0x25, 0x63, 0xeb] // #2563eb
+const BRAND = [0xd8, 0x74, 0x74] // #D87474
 const WHITE = [0xff, 0xff, 0xff]
 
 function crc32(buf) {

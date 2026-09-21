@@ -25,7 +25,7 @@ export function MonthlyExpenseChart({ data }: MonthlyExpenseChartProps) {
   const barWidth = Math.min(24, barSlot * 0.55)
 
   return (
-    <div className="[--bar-color:#2563eb] dark:[--bar-color:#60a5fa]">
+    <div className="[--bar-color:#74D8D8] dark:[--bar-color:#AFE9E9]">
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"

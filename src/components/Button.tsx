@@ -7,7 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: 'bg-brand text-white hover:bg-blue-700 active:bg-blue-800',
+  primary: 'bg-brand text-white hover:bg-[#B33232] active:bg-[#B33232]',
   secondary:
     'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700',
   danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',

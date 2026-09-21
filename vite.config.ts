@@ -17,7 +17,7 @@ export default defineConfig({
         short_name: '消耗品管理',
         description: '日用消耗品の在庫・買い物リストを管理するアプリ',
         lang: 'ja',
-        theme_color: '#2563eb',
+        theme_color: '#D87474',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '.',

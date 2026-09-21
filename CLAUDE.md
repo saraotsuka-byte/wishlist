@@ -49,7 +49,8 @@ src/
 - **「よく買う店」と価格情報**: `Item.preferredStoreId` は品目編集フォームでの既定選択に使う任意フィールド。実際の価格比較は `ItemStorePrice`（品目×店舗の組で価格を保持）で行い、複数店の価格を比較して最安値を強調表示する。
 - **月次支出グラフは外部チャートライブラリを使わず自前の軽量SVGで実装する方針**（依存最小化のため。フェーズ3で実装）。
 - **「そろそろ」提案（予測7日以内）に却下・スヌーズ機能は設けない**（シンプルさ優先の決定）。
-- **買い物リストは自動同期方式**。`domain/shoppingList.ts` の `syncShoppingListEntries` が「発注点以下だがリストに未登録の品目」を追加し、「発注点を上回った自動追加(`reason: 'reorder'`)エントリ」を削除対象として返す。手動追加(`isManual: true`)エントリは在庫状況に関わらず残す。買い物リスト画面はitems/entriesの変化を`useEffect`で監視し、この差分を都度DBに反映する。
+- **買い物リストは自動同期方式**。`domain/shoppingList.ts` の `syncShoppingListEntries` が「発注点以下だがリストに未登録の品目」を追加し、「発注点を上回った自動追加(`reason: 'reorder'`)エントリ」を削除対象として返す。手動追加(`isManual: true`)エントリは在庫状況に関わらず残す。買い物リスト画面はitems/entriesの変化を`useEffect`で監視し、`repositories/shoppingListRepository.ts` の `syncAutoEntries` を呼び出して同期する。
+  - **同期の差分計算はDexieトランザクション内でDBから読み直した最新エントリに対して行う**（Reactの`useLiveQuery`スナップショットに対してではない）。`useLiveQuery`は初回読み込み中は既定値（空配列）を返すため、もし差分計算をそのスナップショットに対して行うと、画面遷移のたびにコンポーネントが再マウントされてこのフックが再購読され、DBには既に存在するエントリを「まだリストに無い」と誤判定して重複追加してしまうバグが発生する（実際に発生し修正済み）。`syncAutoEntries`が書き込み直前にDBから最新状態を読み直すことで、エフェクトが何度発火しても重複が起きないようにしている。
 - **購入完了処理**は `domain/shoppingList.ts` の `planPurchaseCompletion` で在庫加算・`StockLog(type: 'purchase')`保存・`Purchase`保存・リストからの除外をまとめて計算し、`repositories/shoppingListRepository.ts` の `completePurchase` が1つのDexieトランザクションとして適用する。店舗ごとにグルーピングした「購入完了」ボタンから、その店舗のチェック済みエントリのみを渡す。単価は `ItemStorePrice` の該当店舗の最新価格を自動的に使用する。
 - **買い物リストのチェックボックスはuncontrolled(`defaultChecked` + `key`)で実装する**。IndexedDBへの書き込みは非同期のため、Reactの制御コンポーネントのままだとチェックした瞬間に一度falseへ巻き戻る視覚的なちらつきが発生する（Playwrightの操作でも「クリックしても状態が変わらない」という形で顕在化した）。`key={entry.id + '-' + entry.checked}` によってDB側の値が確定した時だけ再マウントする方式にして、タップに対する見た目の即時性を確保している。
 - **使用ペース予測**は `domain/prediction.ts` の `computeDailyUsageRate` が直近90日以内の `use` ログのみから1日あたり消費量を計算する（`purchase`/`adjust` は集計対象外）。使用記録が2件未満、または記録期間が1日未満の場合は `undefined`（データ不足）を返す。`predictDaysUntilEmpty` が現在庫と消費ペースから残り日数を計算し、`isSoon`（既定7日以内）で「そろそろ」判定する。

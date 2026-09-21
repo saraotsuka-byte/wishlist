@@ -1,6 +1,6 @@
 import { db } from '../db/db'
-import { planPurchaseCompletion, type CheckedEntryInput } from '../domain/shoppingList'
-import type { ShoppingListEntry } from '../types'
+import { planPurchaseCompletion, syncShoppingListEntries, type CheckedEntryInput } from '../domain/shoppingList'
+import type { Item, ShoppingListEntry } from '../types'
 import { createId } from '../utils/id'
 
 export async function listShoppingListEntries(): Promise<ShoppingListEntry[]> {
@@ -24,16 +24,6 @@ export async function addManualEntry(
   return entry
 }
 
-export async function bulkAddEntries(entries: Omit<ShoppingListEntry, 'id'>[]): Promise<void> {
-  if (entries.length === 0) return
-  await db.shoppingListEntries.bulkAdd(entries.map((entry) => ({ ...entry, id: createId() })))
-}
-
-export async function bulkRemoveEntries(ids: string[]): Promise<void> {
-  if (ids.length === 0) return
-  await db.shoppingListEntries.bulkDelete(ids)
-}
-
 export async function updateEntryQuantity(id: string, quantity: number): Promise<void> {
   await db.shoppingListEntries.update(id, { quantity })
 }
@@ -46,11 +36,35 @@ export async function removeEntry(id: string): Promise<void> {
   await db.shoppingListEntries.delete(id)
 }
 
-export async function bulkUpdateReason(
-  updates: { id: string; reason: 'reorder' | 'soon' }[],
+/**
+ * 発注点以下・そろそろ品目の自動同期を1トランザクションで行う。
+ * Reactの状態(useLiveQueryのスナップショット)ではなく、書き込み直前にDBから
+ * 現在のエントリを読み直して差分計算することで、初回読み込み中の空配列を
+ * 「リストに無い」と誤判定して重複追加してしまうような競合を避ける。
+ */
+export async function syncAutoEntries(
+  items: Item[],
+  daysUntilEmptyByItemId: Map<string, number | undefined>,
+  now: number,
 ): Promise<void> {
-  if (updates.length === 0) return
-  await Promise.all(updates.map((u) => db.shoppingListEntries.update(u.id, { reason: u.reason })))
+  await db.transaction('rw', db.shoppingListEntries, async () => {
+    const currentEntries = await db.shoppingListEntries.toArray()
+    const { toAdd, toRemoveIds, toUpdateReason } = syncShoppingListEntries(
+      items,
+      currentEntries,
+      now,
+      daysUntilEmptyByItemId,
+    )
+    if (toAdd.length > 0) {
+      await db.shoppingListEntries.bulkAdd(toAdd.map((entry) => ({ ...entry, id: createId() })))
+    }
+    if (toRemoveIds.length > 0) {
+      await db.shoppingListEntries.bulkDelete(toRemoveIds)
+    }
+    for (const update of toUpdateReason) {
+      await db.shoppingListEntries.update(update.id, { reason: update.reason })
+    }
+  })
 }
 
 /**

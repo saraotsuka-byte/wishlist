@@ -8,15 +8,13 @@ import { useItems } from '../../hooks/useItems'
 import { usePredictions } from '../../hooks/usePredictions'
 import { useShoppingListEntries } from '../../hooks/useShoppingList'
 import { useStores } from '../../hooks/useStores'
-import { syncShoppingListEntries, type CheckedEntryInput } from '../../domain/shoppingList'
+import type { CheckedEntryInput } from '../../domain/shoppingList'
 import {
   addManualEntry,
-  bulkAddEntries,
-  bulkRemoveEntries,
-  bulkUpdateReason,
   completePurchase,
   removeEntry,
   setEntryChecked,
+  syncAutoEntries,
   updateEntryQuantity,
 } from '../../repositories/shoppingListRepository'
 import type { ShoppingListEntry } from '../../types'
@@ -41,16 +39,11 @@ export function ShoppingList() {
 
   useEffect(() => {
     if (items.length === 0) return
-    const { toAdd, toRemoveIds, toUpdateReason } = syncShoppingListEntries(
-      items,
-      entries,
-      Date.now(),
-      daysUntilEmptyByItemId,
-    )
-    if (toAdd.length > 0) void bulkAddEntries(toAdd)
-    if (toRemoveIds.length > 0) void bulkRemoveEntries(toRemoveIds)
-    if (toUpdateReason.length > 0) void bulkUpdateReason(toUpdateReason)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 差分計算はDBトランザクション内で現在のエントリを読み直してから行う
+    // (repositories/shoppingListRepository.ts の syncAutoEntries)。
+    // useLiveQueryのスナップショット(entries)を直接使わないことで、
+    // エフェクトが短時間に複数回発火しても重複追加が起きないようにしている。
+    void syncAutoEntries(items, daysUntilEmptyByItemId, Date.now())
   }, [items, entries, daysUntilEmptyByItemId])
 
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])

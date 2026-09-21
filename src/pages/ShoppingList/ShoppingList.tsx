@@ -34,8 +34,9 @@ export function ShoppingList() {
   const daysUntilEmptyByItemId = usePredictions(items)
 
   const [addingItemId, setAddingItemId] = useState('')
-  const [addingQty, setAddingQty] = useState(1)
+  const [addingQty, setAddingQty] = useState('1')
   const [pendingCompleteStoreKey, setPendingCompleteStoreKey] = useState<string | null>(null)
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (items.length === 0) return
@@ -67,10 +68,21 @@ export function ShoppingList() {
   const itemsNotInList = items.filter((item) => !entries.some((e) => e.itemId === item.id))
 
   async function handleAddManual() {
-    if (!addingItemId || addingQty <= 0) return
-    await addManualEntry(addingItemId, addingQty)
+    const qty = Math.max(1, Number(addingQty) || 1)
+    if (!addingItemId) return
+    await addManualEntry(addingItemId, qty)
     setAddingItemId('')
-    setAddingQty(1)
+    setAddingQty('1')
+  }
+
+  function commitQuantityDraft(entryId: string, rawValue: string) {
+    const parsed = Math.max(1, Number(rawValue) || 1)
+    void updateEntryQuantity(entryId, parsed)
+    setQuantityDrafts((prev) => {
+      const next = { ...prev }
+      delete next[entryId]
+      return next
+    })
   }
 
   function buildCheckedInput(groupEntries: ShoppingListEntry[], storeId: string | undefined): CheckedEntryInput[] {
@@ -156,10 +168,11 @@ export function ShoppingList() {
                       <input
                         type="number"
                         min={1}
-                        value={entry.quantity}
+                        value={quantityDrafts[entry.id] ?? String(entry.quantity)}
                         onChange={(e) =>
-                          updateEntryQuantity(entry.id, Math.max(1, Number(e.target.value)))
+                          setQuantityDrafts((prev) => ({ ...prev, [entry.id]: e.target.value }))
                         }
+                        onBlur={(e) => commitQuantityDraft(entry.id, e.target.value)}
                         aria-label={`${item.name}の購入数`}
                         className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm dark:border-gray-700 dark:bg-gray-900"
                       />
@@ -209,7 +222,7 @@ export function ShoppingList() {
               type="number"
               min={1}
               value={addingQty}
-              onChange={(e) => setAddingQty(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setAddingQty(e.target.value)}
               className="w-16 rounded-lg border border-gray-300 px-2 py-2 text-center text-sm dark:border-gray-700 dark:bg-gray-900"
             />
             <Button onClick={handleAddManual} disabled={!addingItemId}>

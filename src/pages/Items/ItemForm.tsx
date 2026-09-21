@@ -28,9 +28,9 @@ export function ItemForm() {
   const [categoryId, setCategoryId] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [unit, setUnit] = useState('')
-  const [stock, setStock] = useState(0)
-  const [reorderPoint, setReorderPoint] = useState(0)
-  const [defaultPurchaseQty, setDefaultPurchaseQty] = useState(1)
+  const [stock, setStock] = useState('0')
+  const [reorderPoint, setReorderPoint] = useState('0')
+  const [defaultPurchaseQty, setDefaultPurchaseQty] = useState('1')
   const [note, setNote] = useState('')
   const [storeId, setStoreId] = useState('')
   const [newStoreName, setNewStoreName] = useState('')
@@ -43,9 +43,9 @@ export function ItemForm() {
       setName(existing.name)
       setCategoryId(existing.categoryId)
       setUnit(existing.unit)
-      setStock(existing.stock)
-      setReorderPoint(existing.reorderPoint)
-      setDefaultPurchaseQty(existing.defaultPurchaseQty)
+      setStock(String(existing.stock))
+      setReorderPoint(String(existing.reorderPoint))
+      setDefaultPurchaseQty(String(existing.defaultPurchaseQty))
       setNote(existing.note ?? '')
       setStoreId(existing.preferredStoreId ?? '')
     } else if (categories.length > 0 && !categoryId) {
@@ -90,9 +90,9 @@ export function ItemForm() {
         name: name.trim(),
         categoryId: finalCategoryId,
         unit: unit.trim(),
-        stock,
-        reorderPoint,
-        defaultPurchaseQty,
+        stock: Math.max(0, Number(stock) || 0),
+        reorderPoint: Math.max(0, Number(reorderPoint) || 0),
+        defaultPurchaseQty: Math.max(1, Number(defaultPurchaseQty) || 1),
         note: note.trim() || undefined,
         preferredStoreId: finalStoreId || undefined,
       }
@@ -193,7 +193,7 @@ export function ItemForm() {
               type="number"
               min={0}
               value={stock}
-              onChange={(e) => setStock(Math.max(0, Number(e.target.value)))}
+              onChange={(e) => setStock(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
             />
           </div>
@@ -206,7 +206,7 @@ export function ItemForm() {
               type="number"
               min={0}
               value={reorderPoint}
-              onChange={(e) => setReorderPoint(Math.max(0, Number(e.target.value)))}
+              onChange={(e) => setReorderPoint(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
             />
           </div>
@@ -219,7 +219,7 @@ export function ItemForm() {
               type="number"
               min={1}
               value={defaultPurchaseQty}
-              onChange={(e) => setDefaultPurchaseQty(Math.max(1, Number(e.target.value)))}
+              onChange={(e) => setDefaultPurchaseQty(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900"
             />
           </div>

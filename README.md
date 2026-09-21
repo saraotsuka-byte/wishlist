@@ -7,6 +7,14 @@
 - ホーム画面に追加してオフラインでも使えるPWAです。
 - ダークモードはOSの設定に自動で追従します。
 
+## スマホで使う
+
+このリポジトリへのpush時にGitHub Actionsが自動でビルドし、GitHub Pagesに公開します（初回のみ、リポジトリの Settings → Pages → Source を「GitHub Actions」に設定してください）。
+
+1. スマホのブラウザで `https://saraotsuka-byte.github.io/wishlist/` を開く
+2. Safari(iOS): 共有ボタン →「ホーム画面に追加」／Chrome(Android): メニュー →「ホーム画面に追加」または「アプリをインストール」
+3. ホーム画面のアイコンから起動すると、ブラウザのアドレスバーなしで全画面アプリとして使えます（オフラインでも動作します）
+
 ## セットアップ
 
 Node.js（推奨: v20以上）がインストールされていれば動作します。PowerShellでの実行を想定しています。

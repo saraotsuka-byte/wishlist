@@ -22,6 +22,7 @@ npm run preview      # ビルド成果物をローカルで確認
 - ルーティング: react-router-dom（`HashRouter`。静的ホスティングでもリロード時に404にならないよう採用）
 - テスト: Vitest + Testing Library（jsdom環境）
 - PWA: `vite-plugin-pwa`（`registerType: 'autoUpdate'`。`src/main.tsx` で `virtual:pwa-register` の `registerSW` を呼び出してService Workerを登録する）
+- デプロイ: GitHub Pages（`.github/workflows/deploy.yml` が `main` / `claude/youthful-maxwell-c86w1r` へのpushでテスト・ビルド・公開を自動実行）。プロジェクトページとして配信されるため `vite.config.ts` の `base: '/wishlist/'` が必須（リポジトリ名を変更した場合はここも合わせて変更する）。初回のみリポジトリの Settings → Pages → Source を「GitHub Actions」に設定する必要がある（APIで設定する権限がなく手動対応）。
 
 ## ディレクトリ構成と設計方針
 

@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '../../components/Badge'
-import { MinusIcon, PlusIcon } from '../../components/icons'
+import { Button } from '../../components/Button'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { EditIcon, MinusIcon, PlusIcon, TrashIcon } from '../../components/icons'
 import { PageHeader } from '../../components/PageHeader'
+import { computeAverageDaysPerUnit, lastOpenedDate } from '../../domain/consumptionPace'
 import { computeDailyUsageRate, isSoon, predictDaysUntilEmpty } from '../../domain/prediction'
 import { isBelowReorderPoint, nextStockAfterPurchase, nextStockAfterUse } from '../../domain/stock'
 import { useCategories } from '../../hooks/useCategories'
@@ -11,7 +15,13 @@ import { usePurchasesByItem } from '../../hooks/usePurchases'
 import { useStockLogsByItem } from '../../hooks/useStockLogs'
 import { useStores } from '../../hooks/useStores'
 import { setItemStock } from '../../repositories/itemRepository'
-import { addStockLog } from '../../repositories/stockLogRepository'
+import {
+  addStockLog,
+  deleteStockLogAndRevertStock,
+  editStockLogAndAdjustStock,
+} from '../../repositories/stockLogRepository'
+import type { StockLog } from '../../types'
+import { fromDateInputValue, toDateInputValue } from '../../utils/date'
 
 const LOG_TYPE_LABEL: Record<string, string> = {
   use: '使用',
@@ -33,6 +43,11 @@ export function ItemDetail() {
   const logs = useStockLogsByItem(id)
   const purchases = usePurchasesByItem(id)
 
+  const [editingLogId, setEditingLogId] = useState<string | null>(null)
+  const [editQuantity, setEditQuantity] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [pendingDeleteLogId, setPendingDeleteLogId] = useState<string | null>(null)
+
   if (!item) {
     return (
       <div>
@@ -49,6 +64,8 @@ export function ItemDetail() {
   const dailyRate = computeDailyUsageRate(logs, Date.now())
   const daysUntilEmpty = predictDaysUntilEmpty(item.stock, dailyRate)
   const soon = !low && isSoon(daysUntilEmpty)
+  const avgDaysPerUnit = computeAverageDaysPerUnit(logs)
+  const lastOpened = lastOpenedDate(logs)
 
   async function handleDecrement() {
     if (!item) return
@@ -62,6 +79,31 @@ export function ItemDetail() {
     const next = nextStockAfterPurchase(item.stock, 1)
     await setItemStock(item.id, next)
     await addStockLog(item.id, 'adjust', 1)
+  }
+
+  function startEditLog(log: StockLog) {
+    setEditingLogId(log.id)
+    setEditQuantity(String(log.quantity))
+    setEditDate(toDateInputValue(log.date))
+  }
+
+  function cancelEditLog() {
+    setEditingLogId(null)
+  }
+
+  async function saveEditLog(log: StockLog) {
+    const quantity = Math.max(1, Math.round(Number(editQuantity)) || 1)
+    const date = fromDateInputValue(editDate, log.date)
+    await editStockLogAndAdjustStock(log, { quantity, date })
+    setEditingLogId(null)
+  }
+
+  async function confirmDeleteLog() {
+    const target = nonPurchaseLogs.find((l) => l.id === pendingDeleteLogId)
+    if (target) {
+      await deleteStockLogAndRevertStock(target)
+    }
+    setPendingDeleteLogId(null)
   }
 
   return (
@@ -141,6 +183,22 @@ export function ItemDetail() {
         </section>
 
         <section>
+          <h2 className="mb-2 text-sm font-semibold">消費ペース</h2>
+          <dl className="grid grid-cols-2 gap-3 rounded-xl border border-gray-200 p-4 text-sm dark:border-gray-800">
+            <div>
+              <dt className="text-gray-500 dark:text-gray-400">平均消費日数</dt>
+              <dd className="tabular-nums">
+                {avgDaysPerUnit === undefined ? 'データ収集中' : `${avgDaysPerUnit.toFixed(1)}日/個`}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 dark:text-gray-400">最終開封日</dt>
+              <dd>{lastOpened === undefined ? '記録なし' : formatDate(lastOpened)}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section>
           <h2 className="mb-2 text-sm font-semibold">店舗別価格</h2>
           {prices.length === 0 ? (
             <p className="text-sm text-gray-500">価格情報はまだありません。</p>
@@ -191,22 +249,70 @@ export function ItemDetail() {
         </section>
 
         <section>
-          <h2 className="mb-2 text-sm font-semibold">使用・調整履歴</h2>
+          <h2 className="mb-2 text-sm font-semibold">使用・調整履歴（開封履歴）</h2>
           {nonPurchaseLogs.length === 0 ? (
             <p className="text-sm text-gray-500">まだ履歴がありません。</p>
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-              {nonPurchaseLogs.map((log) => (
-                <li key={log.id} className="flex items-center justify-between py-2 text-sm">
-                  <span>{formatDate(log.date)}</span>
-                  <span className="text-gray-500">{LOG_TYPE_LABEL[log.type] ?? log.type}</span>
-                  <span className="tabular-nums">
-                    {log.type === 'use' ? '-' : '+'}
-                    {log.quantity}
-                    {item.unit}
-                  </span>
-                </li>
-              ))}
+              {nonPurchaseLogs.map((log) =>
+                editingLogId === log.id ? (
+                  <li key={log.id} className="flex flex-col gap-2 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={editQuantity}
+                        onChange={(e) => setEditQuantity(e.target.value)}
+                        aria-label="数量"
+                        className="w-20 rounded border border-gray-300 px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+                      />
+                      <span className="text-gray-400">{item.unit}</span>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="secondary" className="!min-h-8 !px-3" onClick={cancelEditLog}>
+                        キャンセル
+                      </Button>
+                      <Button className="!min-h-8 !px-3" onClick={() => saveEditLog(log)}>
+                        保存
+                      </Button>
+                    </div>
+                  </li>
+                ) : (
+                  <li key={log.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                    <span className="shrink-0">{formatDate(log.date)}</span>
+                    <span className="shrink-0 text-gray-500">{LOG_TYPE_LABEL[log.type] ?? log.type}</span>
+                    <span className="flex-1 text-right tabular-nums">
+                      {log.type === 'use' ? '-' : '+'}
+                      {log.quantity}
+                      {item.unit}
+                    </span>
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        aria-label="履歴を修正"
+                        onClick={() => startEditLog(log)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="履歴を削除"
+                        onClick={() => setPendingDeleteLogId(log.id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </section>
@@ -215,6 +321,15 @@ export function ItemDetail() {
           品目一覧に戻る
         </Link>
       </div>
+
+      <ConfirmDialog
+        open={pendingDeleteLogId !== null}
+        title="この履歴を削除しますか？"
+        description="削除すると、この記録が在庫数に与えていた影響（使用による減少・手動修正による増加）も取り消され、現在の在庫数に反映されます。この操作は取り消せません。"
+        confirmLabel="削除する"
+        onConfirm={confirmDeleteLog}
+        onCancel={() => setPendingDeleteLogId(null)}
+      />
     </div>
   )
 }

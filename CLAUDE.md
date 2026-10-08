@@ -60,6 +60,8 @@ src/
 - **バックアップ／復元は全置き換え方式**。`domain/backup.ts` がJSONの妥当性検証（`parseBackup`）を担い、`repositories/backupRepository.ts` の `importAllData` が全テーブルをclearしてからbulkAddし直す（1トランザクション）。復元は取り消せないため、実行前に確認ダイアログを必ず挟む（`pages/Settings/DataManagement.tsx`）。
 - **CSV出力**は購入履歴のみを対象とし、`domain/csv.ts` の `purchasesToCsv`（純粋関数、カンマ/改行/ダブルクォートのエスケープを含む）で文字列化する。Excelでの文字化けを防ぐため、ダウンロード時にUTF-8 BOM（`﻿`）を先頭に付与する。
 - **PWAアイコン**は依存パッケージを増やさず、`scripts/generate-icons.mjs`（Node標準の`zlib`のみでPNGを直接エンコードする使い切りスクリプト）で `public/icons/icon-192.png` / `icon-512.png` を生成した。アイコンを変更したい場合はこのスクリプトを編集して再実行する（`node scripts/generate-icons.mjs`）。
+- **「1個あたりの平均消費日数」**（`domain/consumptionPace.ts`）は、ダッシュボード用の`domain/prediction.ts`（直近90日の総消費量ベース）とは別の指標として追加した。`groupOpeningEvents`が同一日の複数`use`ログを1回の開封イベントに合算し（連続タップによる見かけ上の短い間隔を防ぐ）、`computeAverageDaysPerUnit`が直近3回（既定）の間隔を「間隔開始時点で開封した数量」で正規化してから平均する（複数個同時開封を1個あたりの日数に変換）。開封イベントが2件未満の場合は`undefined`（UI上は「データ収集中」）。品目詳細画面に平均消費日数・最終開封日として表示する。
+- **使用・調整履歴（`StockLog`）の削除・修正**は品目詳細画面から行える。誤操作の取り消しとして、現在の在庫数にも連動して反映する方針（`domain/stockLog.ts`の`stockAfterStockLogDeletion` / `stockAfterStockLogQuantityEdit`、`repositories/stockLogRepository.ts`の`deleteStockLogAndRevertStock` / `editStockLogAndAdjustStock`が1トランザクションで在庫更新とログ削除/更新を行う）。対象は`use`/`adjust`のみで、`purchase`（購入完了処理の記録）はこの機能の対象外（Purchaseレコードと対になるため）。削除・修正後も在庫は0を下限にclampする。
 
 ## テスト方針
 
